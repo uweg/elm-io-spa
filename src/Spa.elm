@@ -1,27 +1,27 @@
-module Spa exposing (Model, spa)
+module Spa exposing (Model, application)
 
 import Browser
 import Browser.Navigation
+import CmdM exposing (CmdM)
 import IO exposing (IO)
 import Monocle.Optional exposing (Optional)
 import Spa.Page
 import Url exposing (Url)
 
 
-type Model current previous context route error
+type Model current previous context route
     = Loading
     | Ready
         { key : Browser.Navigation.Key
         , context : context
         , page : Spa.Page.Model current previous
         , route : route
-        , error : Maybe error
         }
 
 
 pageOptional :
     Optional
-        (Model current previous context route error)
+        (Model current previous context route)
         (Spa.Page.Model current previous)
 pageOptional =
     { getOption =
@@ -43,19 +43,19 @@ pageOptional =
     }
 
 
-spa :
-    context
+application :
+    CmdM context
     -> view
-    -> (msg -> IO (Model () () context route error) msg)
+    -> (msg -> IO (Model () () context route) msg)
     -> (Url -> route)
-    -> (context -> b -> Browser.Document (IO (Model () () context route error) msg))
+    -> (context -> b -> Browser.Document (IO (Model () () context route) msg))
     ->
-        ((IO (Spa.Page.Model () ()) msg -> IO (Model () () context route error) msg)
+        ((IO (Spa.Page.Model () ()) msg -> IO (Model () () context route) msg)
          -> view
          -> b
         )
-    -> IO.Program flags (Model () () context route error) msg
-spa context defaultView update fromUrl toDocument mapView =
+    -> IO.Program flags (Model () () context route) msg
+application context defaultView update fromUrl toDocument mapView =
     Spa.Page.setup defaultView
         |> (\stack ->
                 IO.application
@@ -70,38 +70,48 @@ spa context defaultView update fromUrl toDocument mapView =
 
 
 init :
-    context
+    CmdM context
     -> (Url -> route)
     -> Spa.Page.Stack current previous route msg context view
     -> flags
     -> Url
     -> Browser.Navigation.Key
-    -> ( Model current previous context route error, IO (Model current previous context route error) msg )
+    ->
+        ( Model current previous context route
+        , IO (Model current previous context route) msg
+        )
 init context fromUrl (Spa.Page.Stack stack) flags url key =
-    let
-        route =
-            fromUrl url
+    ( Loading
+    , context
+        |> IO.liftM
+        |> IO.andThen
+            (\context_ ->
+                let
+                    route =
+                        fromUrl url
 
-        page : Spa.Page.Model current previous
-        page =
-            stack.init context route Nothing
-                |> Tuple.first
-    in
-    ( Ready
-        { key = key
-        , page = page
-        , route = route
-        , context = context
-        , error = Nothing
-        }
-    , IO.none
+                    page : Spa.Page.Model current previous
+                    page =
+                        stack.init context_ route Nothing
+                            |> Tuple.first
+                in
+                IO.set
+                    (Ready
+                        { key = key
+                        , page = page
+                        , route = route
+                        , context = context_
+                        }
+                    )
+                    |> IO.andThen (\_ -> IO.none)
+            )
     )
 
 
 subscriptions :
     Spa.Page.Stack current previous route msg context view
-    -> Model current previous context route error
-    -> Sub (IO (Model current previous context route error) msg)
+    -> Model current previous context route
+    -> Sub (IO (Model current previous context route) msg)
 subscriptions (Spa.Page.Stack stack) model =
     case model of
         Ready ready ->
@@ -112,7 +122,7 @@ subscriptions (Spa.Page.Stack stack) model =
             Sub.none
 
 
-onUrlRequest : Browser.UrlRequest -> IO (Model current previous context route error) msg
+onUrlRequest : Browser.UrlRequest -> IO (Model current previous context route) msg
 onUrlRequest request =
     case request of
         Browser.Internal url ->
@@ -137,7 +147,7 @@ onUrlChange :
     (Url -> route)
     -> Spa.Page.Stack current previous route msg context view
     -> Url
-    -> IO (Model current previous context route error) msg
+    -> IO (Model current previous context route) msg
 onUrlChange fromUrl (Spa.Page.Stack stack) url =
     IO.get
         |> IO.andThen
@@ -158,7 +168,7 @@ onUrlChange fromUrl (Spa.Page.Stack stack) url =
 
                                 --changePage stack route model.identity (Just model.page)
                             in
-                            Ready { ready | page = pageModel, route = route, error = Nothing }
+                            Ready { ready | page = pageModel, route = route }
                                 |> IO.set
                                 |> IO.andThen (\_ -> io |> IO.optional pageOptional)
 
@@ -169,15 +179,15 @@ onUrlChange fromUrl (Spa.Page.Stack stack) url =
 
 view :
     ((IO (Spa.Page.Model current previous) msg
-      -> IO (Model current previous context route error) msg
+      -> IO (Model current previous context route) msg
      )
      -> view
      -> b
     )
-    -> (context -> b -> Browser.Document (IO (Model current previous context route error) msg))
+    -> (context -> b -> Browser.Document (IO (Model current previous context route) msg))
     -> Spa.Page.Stack current previous route msg context view
-    -> Model current previous context route error
-    -> Browser.Document (IO (Model current previous context route error) msg)
+    -> Model current previous context route
+    -> Browser.Document (IO (Model current previous context route) msg)
 view mapView toDocument (Spa.Page.Stack stack) model =
     case model of
         Ready ready ->
