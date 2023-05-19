@@ -1,9 +1,10 @@
-module Spa exposing (Model, application)
+module Spa exposing (Model, toApplication)
 
 import Browser
 import Browser.Navigation
 import CmdM exposing (CmdM)
 import IO exposing (IO)
+import Json.Encode as E
 import Monocle.Optional exposing (Optional)
 import Spa.Page
 import Url exposing (Url)
@@ -43,30 +44,23 @@ pageOptional =
     }
 
 
-application :
+toApplication :
     CmdM context
-    -> view
-    -> (msg -> IO (Model () () context route) msg)
+    -> (msg -> IO (Model current previous context route) msg)
     -> (Url -> route)
-    -> (context -> b -> Browser.Document (IO (Model () () context route) msg))
-    ->
-        ((IO (Spa.Page.Model () ()) msg -> IO (Model () () context route) msg)
-         -> view
-         -> b
-        )
-    -> IO.Program flags (Model () () context route) msg
-application context defaultView update fromUrl toDocument mapView =
-    Spa.Page.setup defaultView
-        |> (\stack ->
-                IO.application
-                    { init = init context fromUrl stack
-                    , subscriptions = subscriptions stack
-                    , update = update
-                    , onUrlRequest = onUrlRequest
-                    , onUrlChange = onUrlChange fromUrl stack
-                    , view = view mapView toDocument stack
-                    }
-           )
+    -> (context -> a -> Browser.Document (IO (Model current previous context route) msg))
+    -> ((IO (Spa.Page.Model current previous) msg -> IO (Model current previous context route) msg) -> view -> a)
+    -> Spa.Page.Stack current previous route msg context view
+    -> IO.Program E.Value (Model current previous context route) msg
+toApplication context update fromUrl toDocument mapView stack =
+    IO.application
+        { init = init context fromUrl stack
+        , subscriptions = subscriptions stack
+        , update = update
+        , onUrlRequest = onUrlRequest
+        , onUrlChange = onUrlChange fromUrl stack
+        , view = view mapView toDocument stack
+        }
 
 
 init :
