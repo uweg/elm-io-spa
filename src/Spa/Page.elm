@@ -13,18 +13,18 @@ import IO exposing (IO)
 import Monocle.Prism exposing (Prism)
 
 
-type alias Page model flags route msg context view =
+type alias Page model flags msg context view =
     { init : context -> flags -> ( model, IO model msg )
     , subscriptions : Maybe (model -> Sub (IO model msg))
-    , view : context -> route -> flags -> model -> view
+    , view : context -> flags -> model -> view
     , flagsChanged : Maybe (context -> model -> flags -> ( model, IO model msg ))
     }
 
 
 page :
     (context -> flags -> ( model, IO model msg ))
-    -> (context -> route -> flags -> model -> view)
-    -> Page model flags route msg context view
+    -> (context -> flags -> model -> view)
+    -> Page model flags msg context view
 page init view =
     { init = init
     , subscriptions = Nothing
@@ -35,16 +35,16 @@ page init view =
 
 withSubscriptions :
     (model -> Sub (IO model msg))
-    -> Page model flags route msg context view
-    -> Page model flags route msg context view
+    -> Page model flags msg context view
+    -> Page model flags msg context view
 withSubscriptions subscriptions page_ =
     { page_ | subscriptions = Just subscriptions }
 
 
 onFlagsChanged :
     (context -> model -> flags -> ( model, IO model msg ))
-    -> Page model flags route msg context view
-    -> Page model flags route msg context view
+    -> Page model flags msg context view
+    -> Page model flags msg context view
 onFlagsChanged flagsChanged_ page_ =
     { page_ | flagsChanged = Just flagsChanged_ }
 
@@ -118,7 +118,7 @@ add :
     ( (IO current msg -> IO (Model current previous) msg) -> (currentView -> view)
     , (IO previous msg -> IO (Model current previous) msg) -> (previousView -> view)
     )
-    -> Page current flags route msg context currentView
+    -> Page current flags msg context currentView
     -> (route -> Maybe flags)
     -> Stack previousCurrent previousPrevious route msg context previousView
     -> Stack current (Model previousCurrent previousPrevious) route msg context view
@@ -183,7 +183,7 @@ add ( mapView, mapPreviousView ) page_ matchRoute (Stack prev) =
                 Current current ->
                     case matchRoute route of
                         Just flags ->
-                            page_.view identity route flags current |> mapView (IO.prism currentPrism)
+                            page_.view identity flags current |> mapView (IO.prism currentPrism)
 
                         Nothing ->
                             prev.defaultView |> mapPreviousView (IO.prism previousPrism)
