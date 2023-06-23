@@ -45,7 +45,7 @@ pageOptional =
 
 
 toApplication :
-    CmdM context
+    (E.Value -> CmdM context)
     -> (msg -> IO (Model current previous context route) msg)
     -> (Url -> route)
     -> (context -> a -> Browser.Document (IO (Model current previous context route) msg))
@@ -64,10 +64,10 @@ toApplication context update fromUrl toDocument mapView stack =
 
 
 init :
-    CmdM context
+    (E.Value -> CmdM context)
     -> (Url -> route)
     -> Spa.Page.Stack current previous route msg context view
-    -> flags
+    -> E.Value
     -> Url
     -> Browser.Navigation.Key
     ->
@@ -76,7 +76,7 @@ init :
         )
 init context fromUrl (Spa.Page.Stack stack) flags url key =
     ( Loading
-    , context
+    , context flags
         |> IO.liftM
         |> IO.andThen
             (\context_ ->
