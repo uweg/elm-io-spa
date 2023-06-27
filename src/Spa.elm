@@ -2,11 +2,12 @@ module Spa exposing (Model, toApplication)
 
 import Browser
 import Browser.Navigation
-import CmdM exposing (CmdM)
+import Html
 import IO exposing (IO)
 import Json.Encode as E
 import Monocle.Optional exposing (Optional)
 import Spa.Page
+import Task exposing (Task)
 import Url exposing (Url)
 
 
@@ -44,19 +45,40 @@ pageOptional =
     }
 
 
+contextOptional : Optional (Model current previous context route) context
+contextOptional =
+    { getOption =
+        \model ->
+            case model of
+                Loading ->
+                    Nothing
+
+                Ready data ->
+                    Just data.context
+    , set =
+        \context model ->
+            case model of
+                Loading ->
+                    model
+
+                Ready data ->
+                    Ready { data | context = context }
+    }
+
+
 toApplication :
-    (E.Value -> CmdM context)
-    -> (msg -> IO (Model current previous context route) msg)
+    (E.Value -> Task Never context)
+    -> (msg -> IO context msg)
     -> (Url -> route)
-    -> (context -> a -> Browser.Document (IO (Model current previous context route) msg))
-    -> ((IO (Spa.Page.Model current previous) msg -> IO (Model current previous context route) msg) -> view -> a)
-    -> Spa.Page.Stack current previous route msg context view
+    -> (context -> viewB -> Browser.Document (IO context msg))
+    -> ((IO (Spa.Page.Model current previous) msg -> IO (Model current previous context route) msg) -> viewA -> viewB)
+    -> Spa.Page.Stack current previous route msg context viewA
     -> IO.Program E.Value (Model current previous context route) msg
-toApplication context update fromUrl toDocument mapView stack =
+toApplication initContext update fromUrl toDocument mapView stack =
     IO.application
-        { init = init context fromUrl stack
+        { init = init initContext fromUrl stack
         , subscriptions = subscriptions stack
-        , update = update
+        , update = update >> IO.optional contextOptional
         , onUrlRequest = onUrlRequest
         , onUrlChange = onUrlChange fromUrl stack
         , view = view mapView toDocument stack
@@ -64,7 +86,7 @@ toApplication context update fromUrl toDocument mapView stack =
 
 
 init :
-    (E.Value -> CmdM context)
+    (E.Value -> Task Never context)
     -> (Url -> route)
     -> Spa.Page.Stack current previous route msg context view
     -> E.Value
@@ -74,20 +96,20 @@ init :
         ( Model current previous context route
         , IO (Model current previous context route) msg
         )
-init context fromUrl (Spa.Page.Stack stack) flags url key =
+init initContext fromUrl (Spa.Page.Stack stack) flags url key =
     ( Loading
-    , context flags
-        |> IO.liftM
+    , initContext flags
+        |> Task.perform (\a -> a)
+        |> IO.lift
         |> IO.andThen
             (\context_ ->
                 let
+                    route : route
                     route =
                         fromUrl url
 
-                    page : Spa.Page.Model current previous
-                    page =
+                    ( page, io ) =
                         stack.init context_ route Nothing
-                            |> Tuple.first
                 in
                 IO.set
                     (Ready
@@ -97,7 +119,7 @@ init context fromUrl (Spa.Page.Stack stack) flags url key =
                         , context = context_
                         }
                     )
-                    |> IO.andThen (\_ -> IO.none)
+                    |> IO.andThen (\_ -> io |> IO.optional pageOptional)
             )
     )
 
@@ -178,7 +200,7 @@ view :
      -> view
      -> b
     )
-    -> (context -> b -> Browser.Document (IO (Model current previous context route) msg))
+    -> (context -> b -> Browser.Document (IO context msg))
     -> Spa.Page.Stack current previous route msg context view
     -> Model current previous context route
     -> Browser.Document (IO (Model current previous context route) msg)
@@ -189,6 +211,13 @@ view mapView toDocument (Spa.Page.Stack stack) model =
                 (stack.view ready.context ready.route ready.page
                     |> mapView (IO.optional pageOptional)
                 )
+                |> (\document ->
+                        { title = document.title
+                        , body =
+                            document.body
+                                |> List.map (Html.map (IO.optional contextOptional))
+                        }
+                   )
 
         Loading ->
             { title = ""
