@@ -68,17 +68,17 @@ contextOptional =
 
 toApplication :
     (E.Value -> Task Never context)
-    -> (msg -> IO context msg)
+    -> (Browser.Navigation.Key -> msg -> IO context msg)
     -> (Url -> route)
     -> (context -> viewB -> Browser.Document (IO context msg))
     -> ((IO (Spa.Page.Model current previous) msg -> IO (Model current previous context route) msg) -> viewA -> viewB)
     -> Spa.Page.Stack current previous route msg context viewA
     -> IO.Program E.Value (Model current previous context route) msg
-toApplication initContext update fromUrl toDocument mapView stack =
+toApplication initContext update_ fromUrl toDocument mapView stack =
     IO.application
         { init = init initContext fromUrl stack
         , subscriptions = subscriptions stack
-        , update = update >> IO.optional contextOptional
+        , update = update update_
         , onUrlRequest = onUrlRequest
         , onUrlChange = onUrlChange fromUrl stack
         , view = view mapView toDocument stack
@@ -136,6 +136,19 @@ subscriptions (Spa.Page.Stack stack) model =
 
         Loading ->
             Sub.none
+
+
+update update_ msg =
+    IO.get
+        |> IO.andThen
+            (\model ->
+                case model of
+                    Ready ready ->
+                        update_ ready.key msg |> IO.optional contextOptional
+
+                    Loading ->
+                        IO.none
+            )
 
 
 onUrlRequest : Browser.UrlRequest -> IO (Model current previous context route) msg
@@ -197,11 +210,11 @@ view :
     ((IO (Spa.Page.Model current previous) msg
       -> IO (Model current previous context route) msg
      )
-     -> view
-     -> b
+     -> viewA
+     -> viewB
     )
-    -> (context -> b -> Browser.Document (IO context msg))
-    -> Spa.Page.Stack current previous route msg context view
+    -> (context -> viewB -> Browser.Document (IO context msg))
+    -> Spa.Page.Stack current previous route msg context viewA
     -> Model current previous context route
     -> Browser.Document (IO (Model current previous context route) msg)
 view mapView toDocument (Spa.Page.Stack stack) model =
