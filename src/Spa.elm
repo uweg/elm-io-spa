@@ -66,14 +66,21 @@ contextOptional =
     }
 
 
-toApplication initContext update_ fromUrl mapView toDocument stack =
+toApplication :
+    (E.Value -> Task Never context)
+    -> (Browser.Navigation.Key -> msg -> IO context msg)
+    -> (Url -> route)
+    -> (context -> view -> Browser.Document (IO (Spa.Page.Model current previous) msg))
+    -> Spa.Page.Stack current previous route msg context view
+    -> IO.Program E.Value (Model current previous context route) msg
+toApplication init_ update_ toRoute toDocument stack =
     IO.application
-        { init = init initContext fromUrl stack
+        { init = init init_ toRoute stack
         , subscriptions = subscriptions stack
         , update = update update_
         , onUrlRequest = onUrlRequest
-        , onUrlChange = onUrlChange fromUrl stack
-        , view = view mapView toDocument stack
+        , onUrlChange = onUrlChange toRoute stack
+        , view = view toDocument stack
         }
 
 
@@ -169,7 +176,7 @@ onUrlChange :
     -> Spa.Page.Stack current previous route msg context view
     -> Url
     -> IO (Model current previous context route) msg
-onUrlChange fromUrl (Spa.Page.Stack stack) url =
+onUrlChange toRoute (Spa.Page.Stack stack) url =
     IO.get
         |> IO.andThen
             (\model ->
@@ -177,7 +184,7 @@ onUrlChange fromUrl (Spa.Page.Stack stack) url =
                     Ready ready ->
                         let
                             route =
-                                fromUrl url
+                                toRoute url
                         in
                         if route == ready.route then
                             IO.none
@@ -198,23 +205,24 @@ onUrlChange fromUrl (Spa.Page.Stack stack) url =
             )
 
 
-view mapView toDocument (Spa.Page.Stack stack) model =
+view :
+    (context -> view -> Browser.Document (IO (Spa.Page.Model current previous) msg))
+    -> Spa.Page.Stack current previous route msg context view
+    -> Model current previous context route
+    -> Browser.Document (IO (Model current previous context route) msg)
+view toDocument (Spa.Page.Stack stack) model =
     case model of
         Ready ready ->
             stack.view ready.context ready.route ready.page
-                |> mapView (IO.optional pageOptional)
                 |> toDocument ready.context
                 |> (\document ->
                         { title = document.title
                         , body =
                             document.body
-                                --|> List.map (Html.map (IO.optional pageOptional))
+                                |> List.map (Html.map (IO.optional pageOptional))
                         }
                    )
 
-        --stack.view ready.context ready.route ready.page
-        --    |> mapView (IO.optional pageOptional)
-        --    |> toDocument ready.context
         Loading ->
             { title = ""
             , body = []
