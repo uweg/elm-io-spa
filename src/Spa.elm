@@ -1,4 +1,4 @@
-module Spa exposing (Model, toApplication)
+module Spa exposing (toApplication)
 
 import Browser
 import Browser.Navigation
@@ -66,15 +66,7 @@ contextOptional =
     }
 
 
-toApplication :
-    (E.Value -> Task Never context)
-    -> (Browser.Navigation.Key -> msg -> IO context msg)
-    -> (Url -> route)
-    -> (context -> viewB -> Browser.Document (IO context msg))
-    -> ((IO (Spa.Page.Model current previous) msg -> IO (Model current previous context route) msg) -> viewA -> viewB)
-    -> Spa.Page.Stack current previous route msg context viewA
-    -> IO.Program E.Value (Model current previous context route) msg
-toApplication initContext update_ fromUrl toDocument mapView stack =
+toApplication initContext update_ fromUrl mapView toDocument stack =
     IO.application
         { init = init initContext fromUrl stack
         , subscriptions = subscriptions stack
@@ -206,32 +198,23 @@ onUrlChange fromUrl (Spa.Page.Stack stack) url =
             )
 
 
-view :
-    ((IO (Spa.Page.Model current previous) msg
-      -> IO (Model current previous context route) msg
-     )
-     -> viewA
-     -> viewB
-    )
-    -> (context -> viewB -> Browser.Document (IO context msg))
-    -> Spa.Page.Stack current previous route msg context viewA
-    -> Model current previous context route
-    -> Browser.Document (IO (Model current previous context route) msg)
 view mapView toDocument (Spa.Page.Stack stack) model =
     case model of
         Ready ready ->
-            toDocument ready.context
-                (stack.view ready.context ready.route ready.page
-                    |> mapView (IO.optional pageOptional)
-                )
+            stack.view ready.context ready.route ready.page
+                |> mapView (IO.optional pageOptional)
+                |> toDocument ready.context
                 |> (\document ->
                         { title = document.title
                         , body =
                             document.body
-                                |> List.map (Html.map (IO.optional contextOptional))
+                                --|> List.map (Html.map (IO.optional pageOptional))
                         }
                    )
 
+        --stack.view ready.context ready.route ready.page
+        --    |> mapView (IO.optional pageOptional)
+        --    |> toDocument ready.context
         Loading ->
             { title = ""
             , body = []
