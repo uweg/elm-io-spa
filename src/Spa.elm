@@ -1,10 +1,9 @@
-module Spa exposing (toApplication)
+module Spa exposing (Page, addPage, page, setup, toApplication, withSubscriptions)
 
 import Browser
 import Browser.Navigation
 import Html
 import IO exposing (IO)
-import Json.Encode as E
 import Monocle.Optional exposing (Optional)
 import Spa.Page
 import Task exposing (Task)
@@ -67,13 +66,13 @@ sharedOptional =
 
 
 toApplication :
-    (E.Value -> Task Never shared)
+    (flags -> Task Never shared)
     -> (Browser.Navigation.Key -> msg -> IO shared msg)
     -> (Url -> route)
     -> (route -> IO shared msg)
     -> (shared -> view -> Browser.Document (IO (Spa.Page.Model current previous) msg))
     -> Spa.Page.Stack current previous route msg shared view
-    -> IO.Program E.Value (Model current previous shared route) msg
+    -> IO.Program flags (Model current previous shared route) msg
 toApplication init_ update_ toRoute onUrlChange_ toDocument stack =
     IO.application
         { init = init init_ toRoute stack
@@ -85,11 +84,46 @@ toApplication init_ update_ toRoute onUrlChange_ toDocument stack =
         }
 
 
+setup : view -> Spa.Page.Stack () () route msg shared view
+setup =
+    Spa.Page.setup
+
+
+type alias Page model flags msg shared view =
+    Spa.Page.Page model flags msg shared view
+
+
+page :
+    (shared -> flags -> ( model, IO model msg ))
+    -> (shared -> flags -> model -> view)
+    -> Spa.Page.Page model flags msg shared view
+page =
+    Spa.Page.page
+
+
+addPage :
+    ( (IO current msg -> IO (Spa.Page.Model current previous) msg) -> currentView -> view, (IO previous msg -> IO (Spa.Page.Model current previous) msg) -> previousView -> view )
+    -> Page current flags msg context currentView
+    -> (route -> Maybe flags)
+    -> Spa.Page.Stack previousCurrent previousPrevious route msg context previousView
+    -> Spa.Page.Stack current (Spa.Page.Model previousCurrent previousPrevious) route msg context view
+addPage =
+    Spa.Page.add
+
+
+withSubscriptions :
+    (model -> Sub (IO model msg))
+    -> Page model flags msg context view
+    -> Page model flags msg context view
+withSubscriptions =
+    Spa.Page.withSubscriptions
+
+
 init :
-    (E.Value -> Task Never shared)
+    (flags -> Task Never shared)
     -> (Url -> route)
     -> Spa.Page.Stack current previous route msg shared view
-    -> E.Value
+    -> flags
     -> Url
     -> Browser.Navigation.Key
     ->
@@ -108,13 +142,13 @@ init init_ fromUrl (Spa.Page.Stack stack) flags url key =
                     route =
                         fromUrl url
 
-                    ( page, io ) =
+                    ( page_, io ) =
                         stack.init shared route Nothing
                 in
                 IO.set
                     (Ready
                         { key = key
-                        , page = page
+                        , page = page_
                         , route = route
                         , shared = shared
                         }
