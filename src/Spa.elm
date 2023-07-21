@@ -1,4 +1,12 @@
-module Spa exposing (Page, addPage, page, setup, toApplication, withSubscriptions)
+module Spa exposing
+    ( Model
+    , Page
+    , addPage
+    , page
+    , setup
+    , toApplication
+    , withSubscriptions
+    )
 
 import Browser
 import Browser.Navigation
