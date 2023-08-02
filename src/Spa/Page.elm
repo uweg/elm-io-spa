@@ -3,9 +3,11 @@ module Spa.Page exposing
     , Page
     , Stack(..)
     , add
+    , info
     , onFlagsChanged
     , page
     , setup
+    , withInfo
     , withSubscriptions
     )
 
@@ -54,7 +56,20 @@ type Model current previous
     | Previous previous
 
 
-type Stack current previous route msg context view
+withInfo : (info -> info) -> Stack current previous route msg context view info -> Stack current previous route msg context view info
+withInfo updateInfo (Stack stack) =
+    Stack
+        { stack
+            | info = updateInfo stack.info
+        }
+
+
+info : Stack current previous route msg context view info -> info
+info (Stack stack) =
+    stack.info
+
+
+type Stack current previous route msg context view info
     = Stack
         { init :
             context
@@ -70,16 +85,18 @@ type Stack current previous route msg context view
             -> Model current previous
             -> view
         , defaultView : view
+        , info : info
         }
 
 
-setup : view -> Stack () () route msg context view
-setup defaultView =
+setup : view -> info -> Stack () () route msg context view info
+setup defaultView info_ =
     Stack
         { init = \_ _ _ -> ( Current (), IO.none )
         , subscriptions = \_ -> Sub.none
         , view = \_ _ _ -> defaultView
         , defaultView = defaultView
+        , info = info_
         }
 
 
@@ -120,8 +137,8 @@ add :
     )
     -> Page current flags msg context currentView
     -> (route -> Maybe flags)
-    -> Stack previousCurrent previousPrevious route msg context previousView
-    -> Stack current (Model previousCurrent previousPrevious) route msg context view
+    -> Stack previousCurrent previousPrevious route msg context previousView info
+    -> Stack current (Model previousCurrent previousPrevious) route msg context view info
 add ( mapView, mapPreviousView ) page_ matchRoute (Stack prev) =
     let
         init :
@@ -154,10 +171,6 @@ add ( mapView, mapPreviousView ) page_ matchRoute (Stack prev) =
                     let
                         ( model, io ) =
                             prev.init identity route (Maybe.andThen getPrevious model_)
-
-                        m__ : Model previousCurrent previousPrevious
-                        m__ =
-                            model
                     in
                     ( Previous model, io |> IO.prism previousPrism )
 
@@ -196,4 +209,5 @@ add ( mapView, mapPreviousView ) page_ matchRoute (Stack prev) =
         , subscriptions = subscriptions
         , view = view
         , defaultView = prev.defaultView |> mapPreviousView (IO.prism previousPrism)
+        , info = prev.info
         }

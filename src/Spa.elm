@@ -1,8 +1,6 @@
 module Spa exposing
     ( Model
-    , Page
-    , addPage
-    , page
+    , onUrlChange
     , setup
     , toApplication
     , withSubscriptions
@@ -18,7 +16,7 @@ import Task exposing (Task)
 import Url exposing (Url)
 
 
-type Model current previous shared route
+type Model current previous shared route error
     = Loading
     | Ready
         { key : Browser.Navigation.Key
@@ -26,11 +24,12 @@ type Model current previous shared route
         , page : Spa.Page.Model current previous
         , route : route
         }
+    | Error error
 
 
 pageOptional :
     Optional
-        (Model current previous shared route)
+        (Model current previous shared route error)
         (Spa.Page.Model current previous)
 pageOptional =
     { getOption =
@@ -52,152 +51,180 @@ pageOptional =
     }
 
 
-sharedOptional : Optional (Model current previous shared route) shared
+sharedOptional : Optional (Model current previous shared route error) shared
 sharedOptional =
     { getOption =
         \model ->
             case model of
-                Loading ->
-                    Nothing
-
                 Ready data ->
                     Just data.shared
+
+                _ ->
+                    Nothing
     , set =
         \shared model ->
             case model of
-                Loading ->
-                    model
-
                 Ready data ->
                     Ready { data | shared = shared }
+
+                _ ->
+                    model
     }
 
 
-toApplication :
-    (flags -> Task Never shared)
+type alias Info flags error shared msg route =
+    { init : flags -> route -> Task error shared
+    , update : Browser.Navigation.Key -> msg -> IO shared msg
+    , toRoute : Url -> route
+    , onUrlChange : Maybe (route -> IO shared msg)
+    , subscriptions : Maybe (shared -> Sub (IO shared msg))
+    }
+
+
+setup :
+    (flags -> route -> Task error shared)
     -> (Browser.Navigation.Key -> msg -> IO shared msg)
+    -> view
     -> (Url -> route)
-    -> (route -> IO shared msg)
-    -> (shared -> view -> Browser.Document (IO (Spa.Page.Model current previous) msg))
-    -> Spa.Page.Stack current previous route msg shared view
-    -> IO.Program flags (Model current previous shared route) msg
-toApplication init_ update_ toRoute onUrlChange_ toDocument stack =
+    -> Spa.Page.Stack () () route msg shared view (Info flags error shared msg route)
+setup init_ update_ defaultView toRoute =
+    Spa.Page.setup defaultView
+        { init = init_
+        , update = update_
+        , toRoute = toRoute
+        , onUrlChange = Nothing
+        , subscriptions = Nothing
+        }
+
+
+onUrlChange :
+    (route -> IO shared msg)
+    -> Spa.Page.Stack () () route msg shared view (Info flags error shared msg route)
+    -> Spa.Page.Stack () () route msg shared view (Info flags error shared msg route)
+onUrlChange onUrlChange__ stack =
+    Spa.Page.withInfo
+        (\info ->
+            { info
+                | onUrlChange = Just onUrlChange__
+            }
+        )
+        stack
+
+
+withSubscriptions :
+    (shared -> Sub (IO shared msg))
+    -> Spa.Page.Stack () () route msg shared view (Info flags error shared msg route)
+    -> Spa.Page.Stack () () route msg shared view (Info flags error shared msg route)
+withSubscriptions subscriptions_ stack =
+    Spa.Page.withInfo
+        (\info ->
+            { info
+                | subscriptions = Just subscriptions_
+            }
+        )
+        stack
+
+
+toApplication :
+    (shared -> view -> Browser.Document (IO (Spa.Page.Model current previous) msg))
+    -> Spa.Page.Stack current previous route msg shared view (Info flags error shared msg route)
+    -> IO.Program flags (Model current previous shared route error) msg
+toApplication toDocument stack =
     IO.application
-        { init = init init_ toRoute stack
+        { init = init stack
         , subscriptions = subscriptions stack
-        , update = update update_
+        , update = update stack
         , onUrlRequest = onUrlRequest
-        , onUrlChange = onUrlChange toRoute onUrlChange_ stack
+        , onUrlChange = onUrlChange_ stack
         , view = view toDocument stack
         }
 
 
-setup : view -> Spa.Page.Stack () () route msg shared view
-setup =
-    Spa.Page.setup
-
-
-type alias Page model flags msg shared view =
-    Spa.Page.Page model flags msg shared view
-
-
-page :
-    (shared -> flags -> ( model, IO model msg ))
-    -> (shared -> flags -> model -> view)
-    -> Spa.Page.Page model flags msg shared view
-page =
-    Spa.Page.page
-
-
-addPage :
-    ( (IO current msg -> IO (Spa.Page.Model current previous) msg) -> currentView -> view, (IO previous msg -> IO (Spa.Page.Model current previous) msg) -> previousView -> view )
-    -> Page current flags msg context currentView
-    -> (route -> Maybe flags)
-    -> Spa.Page.Stack previousCurrent previousPrevious route msg context previousView
-    -> Spa.Page.Stack current (Spa.Page.Model previousCurrent previousPrevious) route msg context view
-addPage =
-    Spa.Page.add
-
-
-withSubscriptions :
-    (model -> Sub (IO model msg))
-    -> Page model flags msg context view
-    -> Page model flags msg context view
-withSubscriptions =
-    Spa.Page.withSubscriptions
-
-
 init :
-    (flags -> Task Never shared)
-    -> (Url -> route)
-    -> Spa.Page.Stack current previous route msg shared view
+    Spa.Page.Stack current previous route msg shared view (Info flags error shared msg route)
     -> flags
     -> Url
     -> Browser.Navigation.Key
     ->
-        ( Model current previous shared route
-        , IO (Model current previous shared route) msg
+        ( Model current previous shared route error
+        , IO (Model current previous shared route error) msg
         )
-init init_ fromUrl (Spa.Page.Stack stack) flags url key =
+init (Spa.Page.Stack stack) flags url key =
+    let
+        route : route
+        route =
+            stack.info.toRoute url
+    in
     ( Loading
-    , init_ flags
-        |> Task.perform (\a -> a)
+    , stack.info.init flags route
+        |> Task.attempt (\a -> a)
         |> IO.lift
         |> IO.andThen
-            (\shared ->
-                let
-                    route : route
-                    route =
-                        fromUrl url
+            (\result ->
+                case result of
+                    Ok shared ->
+                        let
+                            ( page_, io ) =
+                                stack.init shared route Nothing
+                        in
+                        IO.set
+                            (Ready
+                                { key = key
+                                , page = page_
+                                , route = route
+                                , shared = shared
+                                }
+                            )
+                            |> IO.andThen (\_ -> io |> IO.optional pageOptional)
 
-                    ( page_, io ) =
-                        stack.init shared route Nothing
-                in
-                IO.set
-                    (Ready
-                        { key = key
-                        , page = page_
-                        , route = route
-                        , shared = shared
-                        }
-                    )
-                    |> IO.andThen (\_ -> io |> IO.optional pageOptional)
+                    Err err ->
+                        IO.modify (\_ -> Error err)
+                            |> IO.andThen (\_ -> IO.none)
             )
     )
 
 
 subscriptions :
-    Spa.Page.Stack current previous route msg shared view
-    -> Model current previous shared route
-    -> Sub (IO (Model current previous shared route) msg)
+    Spa.Page.Stack current previous route msg shared view (Info flags error shared msg route)
+    -> Model current previous shared route error
+    -> Sub (IO (Model current previous shared route error) msg)
 subscriptions (Spa.Page.Stack stack) model =
     case model of
         Ready ready ->
-            stack.subscriptions ready.page
-                |> Sub.map (IO.optional pageOptional)
+            Sub.batch
+                [ stack.subscriptions ready.page
+                    |> Sub.map (IO.optional pageOptional)
+                , stack.info.subscriptions
+                    |> Maybe.map
+                        (\subscriptions_ ->
+                            subscriptions_ ready.shared
+                                |> Sub.map (IO.optional sharedOptional)
+                        )
+                    |> Maybe.withDefault Sub.none
+                ]
 
-        Loading ->
+        _ ->
             Sub.none
 
 
 update :
-    (Browser.Navigation.Key -> msg -> IO shared msg)
+    Spa.Page.Stack current previous route msg shared view (Info flags error shared msg route)
     -> msg
-    -> IO (Model current previous shared route) msg
-update update_ msg =
+    -> IO (Model current previous shared route error) msg
+update (Spa.Page.Stack stack) msg =
     IO.get
         |> IO.andThen
             (\model ->
                 case model of
                     Ready ready ->
-                        update_ ready.key msg |> IO.optional sharedOptional
+                        stack.info.update ready.key msg |> IO.optional sharedOptional
 
-                    Loading ->
+                    _ ->
                         IO.none
             )
 
 
-onUrlRequest : Browser.UrlRequest -> IO (Model current previous shared route) msg
+onUrlRequest : Browser.UrlRequest -> IO (Model current previous shared route error) msg
 onUrlRequest request =
     case request of
         Browser.Internal url ->
@@ -218,13 +245,11 @@ onUrlRequest request =
             IO.none
 
 
-onUrlChange :
-    (Url -> route)
-    -> (route -> IO shared msg)
-    -> Spa.Page.Stack current previous route msg shared view
+onUrlChange_ :
+    Spa.Page.Stack current previous route msg shared view (Info flags error shared msg route)
     -> Url
-    -> IO (Model current previous shared route) msg
-onUrlChange toRoute onUrlChange_ (Spa.Page.Stack stack) url =
+    -> IO (Model current previous shared route error) msg
+onUrlChange_ (Spa.Page.Stack stack) url =
     IO.get
         |> IO.andThen
             (\model ->
@@ -233,10 +258,15 @@ onUrlChange toRoute onUrlChange_ (Spa.Page.Stack stack) url =
                         let
                             route : route
                             route =
-                                toRoute url
+                                stack.info.toRoute url
                         in
                         if route == ready.route then
-                            onUrlChange_ route |> IO.optional sharedOptional
+                            case stack.info.onUrlChange of
+                                Just onUrlChange___ ->
+                                    onUrlChange___ route |> IO.optional sharedOptional
+
+                                Nothing ->
+                                    IO.none
 
                         else
                             let
@@ -249,7 +279,12 @@ onUrlChange toRoute onUrlChange_ (Spa.Page.Stack stack) url =
                                     (\_ ->
                                         IO.batchM
                                             [ io |> IO.optional pageOptional
-                                            , onUrlChange_ route |> IO.optional sharedOptional
+                                            , case stack.info.onUrlChange of
+                                                Just onUrlChange___ ->
+                                                    onUrlChange___ route |> IO.optional sharedOptional
+
+                                                Nothing ->
+                                                    IO.none
                                             ]
                                     )
 
@@ -260,9 +295,9 @@ onUrlChange toRoute onUrlChange_ (Spa.Page.Stack stack) url =
 
 view :
     (shared -> view -> Browser.Document (IO (Spa.Page.Model current previous) msg))
-    -> Spa.Page.Stack current previous route msg shared view
-    -> Model current previous shared route
-    -> Browser.Document (IO (Model current previous shared route) msg)
+    -> Spa.Page.Stack current previous route msg shared view (Info flags error shared msg route)
+    -> Model current previous shared route error
+    -> Browser.Document (IO (Model current previous shared route error) msg)
 view toDocument (Spa.Page.Stack stack) model =
     case model of
         Ready ready ->
@@ -278,5 +313,10 @@ view toDocument (Spa.Page.Stack stack) model =
 
         Loading ->
             { title = ""
-            , body = []
+            , body = [ Html.text "Initializing..." ]
+            }
+
+        Error _ ->
+            { title = ""
+            , body = [ Html.text "Could not initialize page. Please try again later." ]
             }
