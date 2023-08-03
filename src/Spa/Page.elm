@@ -15,18 +15,18 @@ import IO exposing (IO)
 import Monocle.Prism exposing (Prism)
 
 
-type alias Page model flags msg context view =
-    { init : context -> flags -> ( model, IO model msg )
+type alias Page model flags msg shared view =
+    { init : shared -> flags -> ( model, IO model msg )
     , subscriptions : Maybe (model -> Sub (IO model msg))
-    , view : context -> flags -> model -> view
-    , flagsChanged : Maybe (context -> model -> flags -> ( model, IO model msg ))
+    , view : shared -> flags -> model -> view
+    , flagsChanged : Maybe (shared -> model -> flags -> ( model, IO model msg ))
     }
 
 
 page :
-    (context -> flags -> ( model, IO model msg ))
-    -> (context -> flags -> model -> view)
-    -> Page model flags msg context view
+    (shared -> flags -> ( model, IO model msg ))
+    -> (shared -> flags -> model -> view)
+    -> Page model flags msg shared view
 page init view =
     { init = init
     , subscriptions = Nothing
@@ -37,16 +37,16 @@ page init view =
 
 withSubscriptions :
     (model -> Sub (IO model msg))
-    -> Page model flags msg context view
-    -> Page model flags msg context view
+    -> Page model flags msg shared view
+    -> Page model flags msg shared view
 withSubscriptions subscriptions page_ =
     { page_ | subscriptions = Just subscriptions }
 
 
 onFlagsChanged :
-    (context -> model -> flags -> ( model, IO model msg ))
-    -> Page model flags msg context view
-    -> Page model flags msg context view
+    (shared -> model -> flags -> ( model, IO model msg ))
+    -> Page model flags msg shared view
+    -> Page model flags msg shared view
 onFlagsChanged flagsChanged_ page_ =
     { page_ | flagsChanged = Just flagsChanged_ }
 
@@ -56,7 +56,10 @@ type Model current previous
     | Previous previous
 
 
-withInfo : (info -> info) -> Stack current previous route msg context view info -> Stack current previous route msg context view info
+withInfo :
+    (info -> info)
+    -> Stack current previous route msg shared view info
+    -> Stack current previous route msg shared view info
 withInfo updateInfo (Stack stack) =
     Stack
         { stack
@@ -64,15 +67,15 @@ withInfo updateInfo (Stack stack) =
         }
 
 
-info : Stack current previous route msg context view info -> info
+info : Stack current previous route msg shared view info -> info
 info (Stack stack) =
     stack.info
 
 
-type Stack current previous route msg context view info
+type Stack current previous route msg shared view info
     = Stack
         { init :
-            context
+            shared
             -> route
             -> Maybe (Model current previous)
             -> ( Model current previous, IO (Model current previous) msg )
@@ -80,7 +83,7 @@ type Stack current previous route msg context view info
             Model current previous
             -> Sub (IO (Model current previous) msg)
         , view :
-            context
+            shared
             -> route
             -> Model current previous
             -> view
@@ -89,7 +92,7 @@ type Stack current previous route msg context view info
         }
 
 
-setup : view -> info -> Stack () () route msg context view info
+setup : view -> info -> Stack () () route msg shared view info
 setup defaultView info_ =
     Stack
         { init = \_ _ _ -> ( Current (), IO.none )
@@ -135,14 +138,14 @@ add :
     ( (IO current msg -> IO (Model current previous) msg) -> (currentView -> view)
     , (IO previous msg -> IO (Model current previous) msg) -> (previousView -> view)
     )
-    -> Page current flags msg context currentView
+    -> Page current flags msg shared currentView
     -> (route -> Maybe flags)
-    -> Stack previousCurrent previousPrevious route msg context previousView info
-    -> Stack current (Model previousCurrent previousPrevious) route msg context view info
+    -> Stack previousCurrent previousPrevious route msg shared previousView info
+    -> Stack current (Model previousCurrent previousPrevious) route msg shared view info
 add ( mapView, mapPreviousView ) page_ matchRoute (Stack prev) =
     let
         init :
-            context
+            shared
             -> route
             -> Maybe (Model current (Model previousCurrent previousPrevious))
             ->
@@ -187,7 +190,7 @@ add ( mapView, mapPreviousView ) page_ matchRoute (Stack prev) =
                     prev.subscriptions previous |> Sub.map (IO.prism previousPrism)
 
         view :
-            context
+            shared
             -> route
             -> Model current (Model previousCurrent previousPrevious)
             -> view
