@@ -3,6 +3,8 @@ module Spa exposing
     , onUrlChange
     , setup
     , toApplication
+    , withErrorView
+    , withLoadingView
     , withSubscriptions
     )
 
@@ -78,6 +80,8 @@ type alias Info flags error shared msg route =
     , toRoute : Url -> route
     , onUrlChange : Maybe (route -> IO shared msg)
     , subscriptions : Maybe (shared -> Sub (IO shared msg))
+    , loadingView : Maybe (Browser.Document msg)
+    , errorView : Maybe (error -> Browser.Document msg)
     }
 
 
@@ -94,6 +98,8 @@ setup init_ update_ defaultView toRoute =
         , toRoute = toRoute
         , onUrlChange = Nothing
         , subscriptions = Nothing
+        , loadingView = Nothing
+        , errorView = Nothing
         }
 
 
@@ -116,13 +122,31 @@ withSubscriptions :
     -> Spa.Page.Stack () () route msg shared view (Info flags error shared msg route)
     -> Spa.Page.Stack () () route msg shared view (Info flags error shared msg route)
 withSubscriptions subscriptions_ stack =
-    Spa.Page.withInfo
-        (\info ->
-            { info
-                | subscriptions = Just subscriptions_
-            }
-        )
-        stack
+    stack
+        |> Spa.Page.withInfo
+            (\info ->
+                { info
+                    | subscriptions = Just subscriptions_
+                }
+            )
+
+
+withLoadingView :
+    Browser.Document msg
+    -> Spa.Page.Stack () () route msg shared view (Info flags error shared msg route)
+    -> Spa.Page.Stack () () route msg shared view (Info flags error shared msg route)
+withLoadingView loadingView stack =
+    stack
+        |> Spa.Page.withInfo (\info -> { info | loadingView = Just loadingView })
+
+
+withErrorView :
+    (error -> Browser.Document msg)
+    -> Spa.Page.Stack () () route msg shared view (Info flags error shared msg route)
+    -> Spa.Page.Stack () () route msg shared view (Info flags error shared msg route)
+withErrorView errorView stack =
+    stack
+        |> Spa.Page.withInfo (\info -> { info | errorView = Just errorView })
 
 
 toApplication :
@@ -312,11 +336,29 @@ view toDocument (Spa.Page.Stack stack) model =
                    )
 
         Loading ->
-            { title = ""
-            , body = [ Html.text "Initializing..." ]
-            }
+            case stack.info.loadingView of
+                Just loadingView ->
+                    { title = loadingView.title
+                    , body = loadingView.body |> List.map (Html.map IO.pure)
+                    }
 
-        Error _ ->
-            { title = ""
-            , body = [ Html.text "Could not initialize page. Please try again later." ]
-            }
+                Nothing ->
+                    { title = ""
+                    , body = []
+                    }
+
+        Error err ->
+            case stack.info.errorView of
+                Just errorView ->
+                    let
+                        errorView_ =
+                            errorView err
+                    in
+                    { title = errorView_.title
+                    , body = errorView_.body |> List.map (Html.map IO.pure)
+                    }
+
+                Nothing ->
+                    { title = ""
+                    , body = [ Html.text "Error" ]
+                    }
