@@ -7,7 +7,6 @@ module View exposing
 
 import Browser
 import Html exposing (Html)
-import Html.Events
 import IO exposing (IO)
 import Msg exposing (Msg)
 import Shared exposing (Shared)

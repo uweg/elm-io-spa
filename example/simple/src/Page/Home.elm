@@ -6,7 +6,7 @@ import IO exposing (IO)
 import Msg exposing (Msg)
 import Route
 import Shared exposing (Shared)
-import Spa
+import Spa.Page as Page exposing (Page)
 import View exposing (View)
 
 
@@ -14,9 +14,9 @@ type alias Model =
     {}
 
 
-page : Spa.Page Model () Msg Shared (View (IO Model Msg))
+page : Page Model () Msg Shared (View (IO Model Msg))
 page =
-    Spa.page
+    Page.page
         (\context flags -> ( {}, IO.none ))
         (\context flags model ->
             [ Html.text "Welcome to elm-io-spa"
@@ -34,6 +34,16 @@ page =
                 [ Html.a
                     [ Route.Subscriptions |> Route.toUrl |> Html.Attributes.href ]
                     [ Html.text "subscriptions" ]
+                ]
+            , Html.div []
+                [ Html.a
+                    [ Route.Flags 1 |> Route.toUrl |> Html.Attributes.href ]
+                    [ Html.text "flags" ]
+                ]
+            , Html.div []
+                [ Html.a
+                    [ Route.Multi 1 |> Route.toUrl |> Html.Attributes.href ]
+                    [ Html.text "multi" ]
                 ]
             ]
         )

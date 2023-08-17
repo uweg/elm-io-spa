@@ -5,7 +5,7 @@ import Html.Events
 import IO exposing (IO)
 import Msg exposing (Msg)
 import Shared exposing (Shared)
-import Spa
+import Spa.Page as Page exposing (Page)
 import Task
 import Time exposing (Posix)
 import View exposing (View)
@@ -16,9 +16,9 @@ type alias Model =
     }
 
 
-page : Spa.Page Model () Msg Shared (View (IO Model Msg))
+page : Page Model () Msg Shared (View (IO Model Msg))
 page =
-    Spa.page
+    Page.page
         (\context flags ->
             ( { time = Nothing
               }
@@ -40,7 +40,7 @@ page =
                 ]
             ]
         )
-        |> Spa.withSubscriptions
+        |> Page.withSubscriptions
             (\model ->
                 Time.every 1000
                     (\a -> a)

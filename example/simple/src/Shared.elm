@@ -4,6 +4,7 @@ module Shared exposing
     )
 
 import Platform exposing (Task)
+import Route exposing (Route)
 import Task
 
 
@@ -11,9 +12,8 @@ type alias Shared =
     { state : Bool }
 
 
-init : () -> Task Never Shared
-init =
-    \flags ->
-        Task.succeed
-            { state = False
-            }
+init : () -> Route -> Task Never Shared
+init flags route =
+    Task.succeed
+        { state = False
+        }

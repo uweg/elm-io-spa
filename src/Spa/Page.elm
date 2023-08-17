@@ -19,7 +19,7 @@ type alias Page model flags msg shared view =
     { init : shared -> flags -> ( model, IO model msg )
     , subscriptions : Maybe (model -> Sub (IO model msg))
     , view : shared -> flags -> model -> view
-    , flagsChanged : Maybe (shared -> model -> flags -> ( model, IO model msg ))
+    , flagsChanged : Maybe (shared -> flags -> IO model msg)
     }
 
 
@@ -44,7 +44,7 @@ withSubscriptions subscriptions page_ =
 
 
 onFlagsChanged :
-    (shared -> model -> flags -> ( model, IO model msg ))
+    (shared -> flags -> IO model msg)
     -> Page model flags msg shared view
     -> Page model flags msg shared view
 onFlagsChanged flagsChanged_ page_ =
@@ -157,11 +157,9 @@ add ( mapView, mapPreviousView ) page_ matchRoute (Stack prev) =
                 Just flags ->
                     case ( page_.flagsChanged, model_ ) of
                         ( Just flagsChanged, Just (Current pageModel) ) ->
-                            let
-                                ( model, io ) =
-                                    flagsChanged identity pageModel flags
-                            in
-                            ( Current model, io |> IO.prism currentPrism )
+                            ( Current pageModel
+                            , flagsChanged identity flags |> IO.prism currentPrism
+                            )
 
                         _ ->
                             let
