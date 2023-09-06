@@ -6,4 +6,4 @@ to make creating SPAs as efficient as possible. Please refer to
 [examples](https://github.com/uweg/elm-io-spa/tree/main/example) to see how it works.
 
 **Attention:** This is not the most recommended way to create an Elm SPA. Use at your
-own risk. However, it runs in various production applications without any problems.
+own risk. However it runs in various production applications without any problems.
