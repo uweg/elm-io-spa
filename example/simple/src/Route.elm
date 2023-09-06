@@ -4,7 +4,6 @@ module Route exposing
     , matchCounter
     , matchFlags
     , matchHome
-    , matchMulti
     , matchShared
     , matchSubscriptions
     , toUrl
@@ -21,7 +20,6 @@ type Route
     | Subscriptions
     | Flags Int
     | Shared
-    | Multi Int
     | NotFound
 
 
@@ -35,7 +33,6 @@ fromUrl =
                 , UP.s "subscriptions" |> UP.map Subscriptions
                 , UP.s "flags" </> UP.int |> UP.map Flags
                 , UP.s "shared" |> UP.map Shared
-                , UP.s "multi" </> UP.int |> UP.map Multi
                 ]
             )
         >> Maybe.withDefault NotFound
@@ -63,9 +60,6 @@ toUrl route =
 
         Shared ->
             UB.absolute [ "shared" ] []
-
-        Multi flags ->
-            UB.absolute [ "multi", String.fromInt flags ] []
 
         NotFound ->
             ""
@@ -116,16 +110,6 @@ matchShared route =
     case route of
         Shared ->
             Just ()
-
-        _ ->
-            Nothing
-
-
-matchMulti : Route -> Maybe Int
-matchMulti route =
-    case route of
-        Multi flags ->
-            Just flags
 
         _ ->
             Nothing

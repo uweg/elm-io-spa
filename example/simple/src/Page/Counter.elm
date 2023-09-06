@@ -16,7 +16,7 @@ type alias Model =
 
 page : Page Model Int Msg Shared (View (IO Model Msg))
 page =
-    Page.page
+    Page.create
         (\context flags ->
             ( { counter = flags
               }

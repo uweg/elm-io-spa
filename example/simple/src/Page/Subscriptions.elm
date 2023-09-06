@@ -18,7 +18,7 @@ type alias Model =
 
 page : Page Model () Msg Shared (View (IO Model Msg))
 page =
-    Page.page
+    Page.create
         (\context flags ->
             ( { time = Nothing
               }

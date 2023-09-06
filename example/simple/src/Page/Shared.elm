@@ -15,7 +15,7 @@ type alias Model =
 
 page : Page Model () Msg Shared (View (IO Model Msg))
 page =
-    Page.page
+    Page.create
         (\shared flags -> ( {}, IO.none ))
         (\shared flags model ->
             [ (if shared.state then

@@ -16,7 +16,7 @@ type alias Model =
 
 page : Page Model () Msg Shared (View (IO Model Msg))
 page =
-    Page.page
+    Page.create
         (\context flags -> ( {}, IO.none ))
         (\context flags model ->
             [ Html.text "Welcome to elm-io-spa"
@@ -39,11 +39,6 @@ page =
                 [ Html.a
                     [ Route.Flags 1 |> Route.toUrl |> Html.Attributes.href ]
                     [ Html.text "flags" ]
-                ]
-            , Html.div []
-                [ Html.a
-                    [ Route.Multi 1 |> Route.toUrl |> Html.Attributes.href ]
-                    [ Html.text "multi" ]
                 ]
             ]
         )
