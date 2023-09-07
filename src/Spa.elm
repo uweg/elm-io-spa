@@ -1,8 +1,8 @@
-module Spa exposing (Model, setup, addPage, withSubscriptions, withLoadingView, withErrorView, onUrlChange, toApplication)
+module Spa exposing (setup, addPage, withSubscriptions, withLoadingView, withErrorView, onUrlChange, toApplication, Model, StackModel)
 
 {-|
 
-@docs Model, setup, addPage, withSubscriptions, withLoadingView, withErrorView, onUrlChange, toApplication
+@docs setup, addPage, withSubscriptions, withLoadingView, withErrorView, onUrlChange, toApplication, Model, StackModel
 
 -}
 
@@ -27,6 +27,11 @@ type Model current previous shared route error
         , route : route
         }
     | Error error
+
+
+{-| -}
+type alias StackModel current previous =
+    Spa.Stack.Model current previous
 
 
 pageOptional :
@@ -85,7 +90,8 @@ type alias Info flags error shared msg route =
     }
 
 
-{-| Sets up a new SPA. -}
+{-| Sets up a new SPA.
+-}
 setup :
     (flags -> route -> Task error shared)
     -> (Browser.Navigation.Key -> msg -> IO shared msg)
@@ -104,7 +110,8 @@ setup init_ update_ defaultView toRoute =
         }
 
 
-{-| Callback when an URL is changed. -}
+{-| Callback when an URL is changed.
+-}
 onUrlChange :
     (route -> IO shared msg)
     -> Stack () () route msg shared view (Info flags error shared msg route)
@@ -119,7 +126,8 @@ onUrlChange onUrlChange__ stack =
         stack
 
 
-{-| Adds global subscriptions. -}
+{-| Adds global subscriptions.
+-}
 withSubscriptions :
     (shared -> Sub (IO shared msg))
     -> Stack () () route msg shared view (Info flags error shared msg route)
@@ -134,7 +142,8 @@ withSubscriptions subscriptions_ stack =
             )
 
 
-{-| Defines view while SPA is loading. -}
+{-| Defines view while SPA is loading.
+-}
 withLoadingView :
     Browser.Document msg
     -> Stack () () route msg shared view (Info flags error shared msg route)
@@ -144,7 +153,8 @@ withLoadingView loadingView stack =
         |> Spa.Stack.updateInfo (\info -> { info | loadingView = Just loadingView })
 
 
-{-| Defines view on loading error. -}
+{-| Defines view on loading error.
+-}
 withErrorView :
     (error -> Browser.Document msg)
     -> Stack () () route msg shared view (Info flags error shared msg route)
@@ -154,7 +164,8 @@ withErrorView errorView stack =
         |> Spa.Stack.updateInfo (\info -> { info | errorView = Just errorView })
 
 
-{-| Adds a page to the SPA. -}
+{-| Adds a page to the SPA.
+-}
 addPage :
     ( (IO current msg -> IO (Spa.Stack.Model current previous) msg) -> currentView -> view
     , (IO previous msg -> IO (Spa.Stack.Model current previous) msg) -> previousView -> view
@@ -167,7 +178,8 @@ addPage =
     Spa.Stack.add
 
 
-{-| Converts the SPA to an Elm application. -}
+{-| Converts the SPA to an Elm application.
+-}
 toApplication :
     (shared -> view -> Browser.Document (IO (Spa.Stack.Model current previous) msg))
     -> Stack current previous route msg shared view (Info flags error shared msg route)
