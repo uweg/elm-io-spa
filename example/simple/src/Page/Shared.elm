@@ -17,7 +17,7 @@ page : Page Model () Msg Shared (View (IO Model Msg))
 page =
     Page.create
         (\shared flags -> ( {}, IO.none ))
-        (\shared flags model ->
+        (\shared model ->
             [ (if shared.state then
                 "on"
 

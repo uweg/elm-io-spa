@@ -18,7 +18,7 @@ page : Page Model () Msg Shared (View (IO Model Msg))
 page =
     Page.create
         (\context flags -> ( {}, IO.none ))
-        (\context flags model ->
+        (\context model ->
             [ Html.text "Welcome to elm-io-spa"
             , Html.div []
                 [ Html.a

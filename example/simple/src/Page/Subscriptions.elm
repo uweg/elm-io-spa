@@ -28,7 +28,7 @@ page =
                 |> IO.andThen updateTime
             )
         )
-        (\context flags model ->
+        (\context model ->
             [ model.time
                 |> Maybe.map (Time.posixToMillis >> String.fromInt)
                 |> Maybe.withDefault "..."

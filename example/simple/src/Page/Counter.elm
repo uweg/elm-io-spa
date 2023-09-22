@@ -23,7 +23,7 @@ page =
             , IO.none
             )
         )
-        (\context flags model ->
+        (\context model ->
             [ model.counter |> String.fromInt |> Html.text
             , Html.button
                 [ Html.Events.onClick decrease ]

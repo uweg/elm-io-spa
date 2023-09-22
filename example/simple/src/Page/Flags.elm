@@ -22,7 +22,7 @@ page =
             , IO.none
             )
         )
-        (\context flags model ->
+        (\context model ->
             [ Html.div []
                 [ "Flags: " ++ String.fromInt model |> Html.text
                 , Html.button
