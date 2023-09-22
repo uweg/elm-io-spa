@@ -13,7 +13,7 @@ import IO exposing (IO)
 type alias Page model flags msg shared view =
     { init : shared -> flags -> ( model, IO model msg )
     , subscriptions : Maybe (model -> Sub (IO model msg))
-    , view : shared -> flags -> model -> view
+    , view : shared -> model -> view
     , flagsChanged : Maybe (shared -> flags -> IO model msg)
     }
 
@@ -22,7 +22,7 @@ type alias Page model flags msg shared view =
 -}
 create :
     (shared -> flags -> ( model, IO model msg ))
-    -> (shared -> flags -> model -> view)
+    -> (shared -> model -> view)
     -> Page model flags msg shared view
 create init view =
     { init = init

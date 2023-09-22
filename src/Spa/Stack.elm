@@ -103,8 +103,8 @@ add ( mapView, mapPreviousView ) page_ matchRoute (Stack prev) =
             case model of
                 Current current ->
                     case matchRoute route of
-                        Just flags ->
-                            page_.view identity flags current |> mapView (IO.prism currentPrism)
+                        Just _ ->
+                            page_.view identity current |> mapView (IO.prism currentPrism)
 
                         Nothing ->
                             prev.defaultView |> mapPreviousView (IO.prism previousPrism)
