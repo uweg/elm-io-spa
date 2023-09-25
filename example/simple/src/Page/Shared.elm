@@ -15,9 +15,10 @@ type alias Model =
 
 page : Page Model () Msg Shared (View (IO Model Msg))
 page =
-    Page.create
-        (\shared flags -> ( {}, IO.none ))
-        (\shared model ->
+    { init =
+        \shared flags -> ( {}, IO.none )
+    , view =
+        \shared model ->
             [ (if shared.state then
                 "on"
 
@@ -34,4 +35,6 @@ page =
                     [ Html.text "back" ]
                 ]
             ]
-        )
+    , subscriptions = \_ -> Sub.none
+    , onFlagsChanged = Nothing
+    }

@@ -23,7 +23,7 @@ onUrlChange route =
 
 
 main =
-    Spa.setup Shared.init Msg.update View.default Route.fromUrl
+    Spa.setup Shared.init Msg.update View.default Route.fromUrl (\_ -> Sub.none)
         |> Spa.onUrlChange onUrlChange
         |> Spa.addPage mappers Page.Home.page Route.matchHome
         |> Spa.addPage mappers Page.Counter.page Route.matchCounter

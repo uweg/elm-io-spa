@@ -62,7 +62,7 @@ add ( mapView, mapPreviousView ) page_ matchRoute (Stack prev) =
         init identity route model_ =
             case matchRoute route of
                 Just flags ->
-                    case ( page_.flagsChanged, model_ ) of
+                    case ( page_.onFlagsChanged, model_ ) of
                         ( Just flagsChanged, Just (Current pageModel) ) ->
                             ( Current pageModel
                             , flagsChanged identity flags |> IO.prism currentPrism
@@ -84,14 +84,11 @@ add ( mapView, mapPreviousView ) page_ matchRoute (Stack prev) =
 
         subscriptions : Model current (Model previousCurrent previousPrevious) -> Sub (IO (Model current (Model previousCurrent previousPrevious)) msg)
         subscriptions model =
-            case ( model, page_.subscriptions ) of
-                ( Current current, Just subscriptions_ ) ->
-                    subscriptions_ current |> Sub.map (IO.prism currentPrism)
+            case model of
+                Current current ->
+                    page_.subscriptions current |> Sub.map (IO.prism currentPrism)
 
-                ( Current _, Nothing ) ->
-                    Sub.none
-
-                ( Previous previous, _ ) ->
+                Previous previous ->
                     prev.subscriptions previous |> Sub.map (IO.prism previousPrism)
 
         view :

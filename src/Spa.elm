@@ -1,4 +1,4 @@
-module Spa exposing (setup, addPage, withSubscriptions, withLoadingView, withErrorView, onUrlChange, toApplication, Model, StackModel)
+module Spa exposing (setup, addPage, withLoadingView, withErrorView, onUrlChange, toApplication, Model, StackModel)
 
 {-|
 
@@ -84,7 +84,7 @@ type alias Info flags error shared msg route =
     , update : Browser.Navigation.Key -> msg -> IO shared msg
     , toRoute : Url -> route
     , onUrlChange : Maybe (route -> IO shared msg)
-    , subscriptions : Maybe (shared -> Sub (IO shared msg))
+    , subscriptions : shared -> Sub (IO shared msg)
     , loadingView : Maybe (Browser.Document msg)
     , errorView : Maybe (error -> Browser.Document msg)
     }
@@ -97,14 +97,15 @@ setup :
     -> (Browser.Navigation.Key -> msg -> IO shared msg)
     -> view
     -> (Url -> route)
+    -> (shared -> Sub (IO shared msg))
     -> Stack () () route msg shared view (Info flags error shared msg route)
-setup init_ update_ defaultView toRoute =
+setup init_ update_ defaultView toRoute subscriptions_ =
     Spa.Stack.setup defaultView
         { init = init_
         , update = update_
         , toRoute = toRoute
         , onUrlChange = Nothing
-        , subscriptions = Nothing
+        , subscriptions = subscriptions_
         , loadingView = Nothing
         , errorView = Nothing
         }
@@ -124,22 +125,6 @@ onUrlChange onUrlChange__ stack =
             }
         )
         stack
-
-
-{-| Adds global subscriptions.
--}
-withSubscriptions :
-    (shared -> Sub (IO shared msg))
-    -> Stack () () route msg shared view (Info flags error shared msg route)
-    -> Stack () () route msg shared view (Info flags error shared msg route)
-withSubscriptions subscriptions_ stack =
-    stack
-        |> Spa.Stack.updateInfo
-            (\info ->
-                { info
-                    | subscriptions = Just subscriptions_
-                }
-            )
 
 
 {-| Defines view while SPA is loading.
@@ -249,13 +234,8 @@ subscriptions (Stack stack) model =
             Sub.batch
                 [ stack.subscriptions ready.page
                     |> Sub.map (IO.optional pageOptional)
-                , stack.info.subscriptions
-                    |> Maybe.map
-                        (\subscriptions_ ->
-                            subscriptions_ ready.shared
-                                |> Sub.map (IO.optional sharedOptional)
-                        )
-                    |> Maybe.withDefault Sub.none
+                , stack.info.subscriptions ready.shared
+                    |> Sub.map (IO.optional sharedOptional)
                 ]
 
         _ ->

@@ -16,13 +16,13 @@ type alias Model =
 
 page : Page Model Int Msg Shared (View (IO Model Msg))
 page =
-    Page.create
-        (\context flags ->
+    { init =
+        \context flags ->
             ( flags + 10
             , IO.none
             )
-        )
-        (\context model ->
+    , view =
+        \context model ->
             [ Html.div []
                 [ "Flags: " ++ String.fromInt model |> Html.text
                 , Html.button
@@ -34,5 +34,6 @@ page =
                     [ Html.text "push" ]
                 ]
             ]
-        )
-        |> Page.onFlagsChanged (\shared flags -> IO.set flags |> IO.andThen (\_ -> IO.none))
+    , onFlagsChanged = Just (\shared flags -> IO.set flags |> IO.andThen (\_ -> IO.none))
+    , subscriptions = \_ -> Sub.none
+    }

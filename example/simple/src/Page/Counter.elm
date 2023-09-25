@@ -5,7 +5,7 @@ import Html.Events
 import IO exposing (IO)
 import Msg exposing (Msg)
 import Shared exposing (Shared)
-import Spa.Page as Page exposing (Page)
+import Spa.Page exposing (Page)
 import View exposing (View)
 
 
@@ -16,14 +16,14 @@ type alias Model =
 
 page : Page Model Int Msg Shared (View (IO Model Msg))
 page =
-    Page.create
-        (\context flags ->
+    { init =
+        \context flags ->
             ( { counter = flags
               }
             , IO.none
             )
-        )
-        (\context model ->
+    , view =
+        \context model ->
             [ model.counter |> String.fromInt |> Html.text
             , Html.button
                 [ Html.Events.onClick decrease ]
@@ -37,7 +37,9 @@ page =
                     [ Html.text "back" ]
                 ]
             ]
-        )
+    , subscriptions = \_ -> Sub.none
+    , onFlagsChanged = Nothing
+    }
 
 
 increase : IO Model Msg
